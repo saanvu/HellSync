@@ -1,162 +1,259 @@
-# 🔥 HellSync
+# 💀 HellSync
 
-<p align="center">
-  <b>A modular Discord system built for scale, interaction, and control.</b>
-</p>
+> A modular, event-driven Discord system built for **automation, economy, moderation, and real-time server intelligence**.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/System-Dual%20Bot%20Ecosystem-8A2BE2?style=for-the-badge"/>
-  <img src="https://img.shields.io/badge/Architecture-Event%20Driven-22c55e?style=for-the-badge"/>
-  <img src="https://img.shields.io/badge/Music-Lavalink-ff69b4?style=for-the-badge"/>
-  <img src="https://img.shields.io/badge/Database-MongoDB-green?style=for-the-badge"/>
-</p>
+![Node.js](https://img.shields.io/badge/Node.js-18+-green)
+![Discord.js](https://img.shields.io/badge/Discord.js-v14-blue)
+![MongoDB](https://img.shields.io/badge/Database-MongoDB-green)
+![Architecture](https://img.shields.io/badge/Architecture-Event--Driven-purple)
 
 ---
 
-## 🧠 What is HellSync?
+## 🧠 Overview
 
-HellSync is a **modular Discord bot system** designed to handle:
+HellSync is a **dual-layer Discord ecosystem**:
 
-* 🎮 Engagement
-* 🎵 Music streaming
-* ⚙️ Server utilities
-* 🛡️ Moderation
-* 📊 Tracking systems
+* ⚙️ **Main Bot (this repo)** → interaction, economy, automation
+* 🛡️ **Anti-Nuke Bot** → security, enforcement
 
-But more importantly:
+But what makes HellSync powerful is:
 
-> It is part of a **dual-bot architecture**, working alongside a dedicated Anti-Nuke system for full server control and protection.
+> It operates as a **real-time event-driven system**, not just command-response.
 
 ---
 
-## ⚡ Core Capabilities
+## ⚡ Core Architecture
 
-### 🎧 Advanced Music System
-
-* Powered by **Lavalink nodes**
-* Queue management + auto handling
-* Multi-platform search support
-
-```js
-defaultSearchPlatform: "spsearch"
-fallbackSearch: "scsearch"
+```text
+Discord Events → Event Handlers → Systems → Actions → Logs
 ```
 
-👉 Production-style music architecture
+HellSync continuously listens to:
 
+* messages
+* edits
+* joins
+* leaves
+* invites
+* interactions
 
----
-
-### 🧠 Modular Command Engine
-
-* Category-based structure:
-
-  * economy
-  * fun
-  * info
-  * moderation
-  * music
-  * setup
-  * utility
-
-👉 Commands are dynamically loaded at runtime
+👉 and reacts **instantly**
 
 ---
 
-### ⚡ Event-Driven Core
+## 🔥 Event System (Core Intelligence Layer)
 
-* Dedicated `events/` system
-* Clean separation of logic
-* Scalable + maintainable
+### 💬 Message Pipeline
 
----
-
-### 📊 Invite Tracking System
-
-* Tracks invite usage per guild
-* Detects join sources
-* Maintains real-time invite cache
-
-👉 Rare feature in custom bots
-
----
-
-### 🛠️ Automation & Moderation Systems
-
-* Auto-role assignment
-* Warning tracking
-* Automod configuration
-* Logging system
-
----
-
-### 🧠 Persistent Data Layer
-
-* MongoDB integration
-* Configurable per-server data
+* Prefix command handling
+* Automod enforcement
+* Spam detection + timeout
+* Bad word filtering
+* Anti-link + anti-caps + anti-mention
 
 ```js
-mongodb: process.env.MONGODB_URI
+runAutomod(message)
+```
+
+👉 Fully dynamic rule-based moderation
+
+
+---
+
+### 📝 Message Logging System
+
+* Tracks:
+
+  * Message deletions
+  * Message edits
+* Uses audit logs to detect:
+
+  * Who deleted what
+* Logs attachments + content
+
+👉 Dyno-level logging system
+ 
+
+---
+
+### 👤 Member Lifecycle System
+
+#### Join System
+
+* Auto-role assignment with permission checks
+* Invite tracking (who invited whom)
+* Suspicious account detection (<7 days)
+
+👉 This is **rare and advanced**
+
+
+---
+
+#### Leave / Kick Detection
+
+* Detects:
+
+  * voluntary leave
+  * kick (via audit logs)
+
+👉 Clean moderation tracking
+
+
+---
+
+### 🔗 Invite Intelligence System
+
+* Tracks invite usage per code
+* Maintains live invite cache
+* Detects which invite was used
+
+👉 This is **non-trivial to implement correctly**
+ 
+
+---
+
+### ⚡ Interaction Engine
+
+* Slash command routing
+* Modal handling (embed builder system)
+* Button interactions
+* Real-time UI flows
+
+👉 Example:
+
+* Create embed → preview → confirm → send
+
+
+
+---
+
+### 🚀 Ready Event (Boot System)
+
+* Loads all commands dynamically
+* Registers slash commands globally
+* Initializes config
+* Sets bot activity
+
+```js
+loadCommands(client)
 ```
 
 
 
 ---
 
-## 🏗️ Architecture
+## 💰 Economy System (Persistent)
 
-```id="z7f1pg"
-HellSync (Main Bot)
+* Wallet + Bank system
+* Daily streak rewards
+* Work system (cooldowns)
+* Transfers between users
+* Deposit / Withdraw
 
-├── Core
-│   ├── index.js (startup + orchestration)
-│   ├── config.js
-│
-├── Commands
+👉 Fully MongoDB-backed
+  
+
+---
+
+## 🎰 Interactive Economy Mechanics
+
+* Gambling system (dice, coin, slots, number)
+* Rob system (PvP economy interaction)
+* Leaderboards (server-based ranking)
+
+👉 This creates an **actual gameplay loop**
+ 
+
+---
+
+## 🛒 Shop & Inventory
+
+* Server shop system
+* Admin-controlled items
+* Inventory storage
+* Purchase system
+
+ 
+
+---
+
+## 🎵 Music System
+
+* Queue + playback control
+* Loop, volume, skip
+* Lyrics + now playing
+
+---
+
+## 🛠️ Utility & Automation
+
+* Auto-role
+* Reminder system
+* Invite tracking
+* Custom embed builder (modal UI)
+
+---
+
+## 📊 Logging System
+
+* Message delete/edit logs
+* Join/leave logs
+* Invite tracking logs
+
+👉 Fully configurable logging pipeline
+
+---
+
+## 🧩 Folder Structure
+
+```text
+src/
+├── commands/
 │   ├── economy/
-│   ├── fun/
-│   ├── info/
 │   ├── moderation/
+│   ├── utility/
 │   ├── music/
-│   ├── setup/
-│   └── utility/
-│
-├── Events
-│   └── Event handlers
-│
-├── Models
-│   └── Data schemas
-│
-├── Utils
-│   └── Helpers (DB, logic, etc.)
+│   ├── info/
+│   └── fun/
+├── events/
+├── models/
+├── utils/
+├── config/
+└── index.js
 ```
 
 ---
 
-## 🔗 HellSync Ecosystem
+## 🧠 Design Philosophy
 
-HellSync is built as a **dual-system architecture**:
+* Event-driven architecture
+* Modular command system
+* Dual execution (prefix + slash)
+* Persistent + scalable
+* Separation of concerns
 
-```id="w3l5hx"
-Main Bot → Features, interaction, music
-Anti-Nuke → Security, protection, enforcement
-```
+---
 
-👉 Separation of concerns = better stability + scalability
+## 🛡️ Anti-Nuke Integration
+
+HellSync works alongside a **dedicated protection bot**:
+
+* Raid detection
+* Audit log monitoring
+* Trusted user system
+* Auto punishment
+
+👉 Keeps core bot clean and fast
 
 ---
 
 ## 🚀 Setup
 
-### 1. Install dependencies
-
 ```bash
+git clone https://github.com/your-username/hellsync.git
+cd hellsync
 npm install
 ```
-
----
-
-### 2. Configure `.env`
 
 ```env
 DISCORD_TOKEN=your_token
@@ -164,49 +261,41 @@ CLIENT_ID=your_client_id
 MONGODB_URI=your_mongo_uri
 ```
 
----
-
-### 3. Run
-
 ```bash
 node src/index.js
 ```
 
 ---
 
-## 🔮 Roadmap
+## ⚠️ Requirements
 
-* 🤖 AI-powered commands
-* 📊 Advanced analytics dashboard
-* 🎵 Multi-node Lavalink scaling
-* 🧠 Smart moderation insights
-* 🌐 Web dashboard
+* Node.js 18+
+* MongoDB
+* Discord bot token
 
 ---
 
-## ⚠️ Disclaimer
+## 🔮 Future Vision
 
-HellSync requires:
-
-* Proper Discord permissions
-* Lavalink node setup for music
-* MongoDB for persistence
+* 🤖 AI integration (Orion)
+* 📊 Web dashboard
+* 🧠 smart automations
+* 🌐 hosted multi-server system
 
 ---
 
 ## 💜 Philosophy
 
-HellSync is not just a bot.
+HellSync is not a bot.
 
 It’s:
 
-> A system designed to scale with your server
-> while staying modular, clean, and powerful.
+> a system that listens, reacts, and evolves with your server
 
 ---
 
-## ✦ Author
+## 👑 Author
 
 Built by **Saanvi**
 
-> Systems over scripts. Always.
+> Systems > Scripts
