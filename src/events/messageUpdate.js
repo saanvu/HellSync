@@ -8,9 +8,9 @@ module.exports = {
         if (oldMessage.content === newMessage.content) return;
 
         const config = client.loggingConfig?.get(newMessage.guild.id);
-        if (!config || !config.enabledLogs.messageEdit || !config.actionLogChannel) return;
+        if (!config || !config.enabledLogs?.messageEdit || !config.actionLogChannel) return;
 
-        if (config.ignoredChannels.includes(newMessage.channel.id)) return;
+        if ((config.ignoredChannels || []).includes(newMessage.channel.id)) return;
 
         const logChannel = newMessage.guild.channels.cache.get(config.actionLogChannel);
         if (!logChannel) return;

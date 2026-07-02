@@ -60,27 +60,53 @@ client.serverStatsConfig = new Map();
 
 // Lavalink Manager setup
 client.lavalink = new LavalinkManager({
-    nodes: [
-        {
-            id: "demibloom-main",
-            host: "20.193.241.108",
-            port: 2333,
-            authorization: "demibloom_1710",
-            secure: false,
-        },
-    ],
-    sendToShard: (guildId, payload) => client.guilds.cache.get(guildId)?.shard?.send(payload),
-    client: {
-        id: process.env.CLIENT_ID || "YOUR_BOT_CLIENT_ID",
-        username: "HellSync",
+  nodes: [
+    {
+      id: "Lavalink",
+      host: "127.0.0.1",
+      port: 2333,
+      authorization: "demibloom_1710",
+      secure: false,
     },
-    autoSkip: true,
-    emitNewSongsOnly: true,
-    playerOptions: {
-        defaultSearchPlatform: "spsearch",
-        fallbackSearch: "scsearch",
+  ],
+  sendToShard: (guildId, payload) =>
+    client.guilds.cache.get(guildId)?.shard?.send(payload),
+  client: {
+    id: process.env.CLIENT_ID,
+    username: "HellSync",
+  },
+  autoSkip: true,
+  emitNewSongsOnly: true,
+  playerOptions: {
+    defaultSearchPlatform: "ytsearch",
+  },
+  advancedOptions: {
+    debugOptions: {
+      noAudio: true,
+      playerDestroy: {
+        debugLog: true,
+      },
     },
+  },
 });
+
+require('./utils/registerActions')(client);
+
+async function deleteControlPanel(player, reason) {
+    const panelMessage = player.data?.controlPanelMessage;
+    if (!panelMessage) return;
+
+    player.data.controlPanelMessage = null;
+
+    try {
+        await panelMessage.delete();
+        console.log(`✓ Deleted control panel (${reason})`);
+    } catch (e) {
+        if (e?.code !== 10008) {
+            console.log(`Could not delete control panel (${reason}):`, e.message);
+        }
+    }
+}
 
 // Raw event for voice updates
 client.on("raw", (d) => client.lavalink.sendRawData(d));
@@ -165,19 +191,75 @@ client.once("ready", async () => {
       console.log(chalk.yellow(`⟳ Reconnecting to node: ${node.options.id}`));
      });
 
+    client.lavalink.on("debug", (eventKey, eventData) => {
+        console.log(chalk.gray(`Lavalink debug [${eventKey}]:`), eventData);
+    });
+
+    client.lavalink.on("playerDisconnect", (player, voiceChannelId) => {
+        console.log(chalk.yellow(`⚠ Player disconnected in ${player.guildId} from voice channel ${voiceChannelId}`));
+    });
+
+    client.lavalink.on("playerSocketClosed", (player, payload) => {
+        console.log(chalk.yellow(`⚠ Player socket closed in ${player.guildId}: code=${payload?.code}, reason=${payload?.reason || "none"}, byRemote=${payload?.byRemote}`));
+    });
+
+    client.lavalink.on("playerMuteChange", (player, selfMuted, serverMuted) => {
+        console.log(chalk.yellow(`⚠ Player mute state changed in ${player.guildId}: selfMuted=${selfMuted}, serverMuted=${serverMuted}`));
+    });
+
+    client.lavalink.on("playerDeafChange", (player, selfDeafed, serverDeafed) => {
+        console.log(chalk.yellow(`⚠ Player deaf state changed in ${player.guildId}: selfDeafed=${selfDeafed}, serverDeafed=${serverDeafed}`));
+    });
+
+    client.lavalink.on("playerSuppressChange", (player, suppressed) => {
+        console.log(chalk.yellow(`⚠ Player suppress state changed in ${player.guildId}: suppressed=${suppressed}`));
+    });
+
+    client.lavalink.on("playerUpdate", (oldPlayerJson, newPlayer) => {
+        console.log(
+            chalk.gray(`Lavalink player update ${newPlayer.guildId}: connected=${newPlayer.connected}, playing=${newPlayer.playing}, paused=${newPlayer.paused}, ping=${JSON.stringify(newPlayer.ping)}`)
+        );
+    });
+
+    client.lavalink.on("trackStart", (player, track) => {
+        console.log(
+            chalk.green(`▶ Track started in ${player.guildId}: ${track?.info?.title || "Unknown"} (${track?.info?.sourceName || "unknown source"})`)
+        );
+    });
+
+    client.lavalink.on("trackEnd", (player, track, payload) => {
+        console.log(
+            chalk.yellow(`■ Track ended in ${player.guildId}: ${track?.info?.title || "Unknown"} (${payload?.reason || "unknown reason"})`)
+        );
+    });
+
+    client.lavalink.on("trackError", async (player, track, payload) => {
+        console.log(
+            chalk.red(`✗ Track error in ${player.guildId}: ${track?.info?.title || "Unknown"} - ${payload?.exception?.message || payload?.error || "Unknown error"}`)
+        );
+
+        const channel = client.channels.cache.get(player.textChannelId);
+        if (channel) {
+            channel.send(`❌ Could not play **${track?.info?.title || "this track"}**. Trying the next track if one is queued.`).catch(() => {});
+        }
+    });
+
+    client.lavalink.on("trackStuck", async (player, track, payload) => {
+        console.log(
+            chalk.red(`✗ Track stuck in ${player.guildId}: ${track?.info?.title || "Unknown"} after ${payload?.thresholdMs || "unknown"}ms`)
+        );
+
+        const channel = client.channels.cache.get(player.textChannelId);
+        if (channel) {
+            channel.send(`❌ Playback got stuck for **${track?.info?.title || "this track"}**. Trying the next track if one is queued.`).catch(() => {});
+        }
+    });
+
     // Queue end - delete panel and destroy player
     client.lavalink.on("queueEnd", async (player) => {
         console.log(`Queue ended for guild ${player.guildId}`);
 
-        // Delete control panel before destroying
-        if (player.data?.controlPanelMessage) {
-            try {
-                await player.data.controlPanelMessage.delete();
-                console.log("✓ Deleted control panel (queue end)");
-            } catch (e) {
-                console.log("Could not delete control panel:", e.message);
-            }
-        }
+        await deleteControlPanel(player, "queue end");
 
         const channel = client.channels.cache.get(player.textChannelId);
         if (channel) channel.send("✅ Queue ended.").catch(() => {});
@@ -188,15 +270,7 @@ client.once("ready", async () => {
     client.lavalink.on("playerDestroy", async (player) => {
         console.log(`Player destroyed for guild ${player.guildId}`);
 
-        // Delete control panel message
-        if (player.data?.controlPanelMessage) {
-            try {
-                await player.data.controlPanelMessage.delete();
-                console.log("✓ Deleted control panel (player destroy)");
-            } catch (e) {
-                console.log("Could not delete control panel:", e.message);
-            }
-        }
+        await deleteControlPanel(player, "player destroy");
     });
 
     // Set bot status
@@ -233,7 +307,6 @@ process.on("unhandledRejection", (error) => {
 
 process.on("uncaughtException", (error) => {
     console.error(chalk.red.bold("Uncaught Exception:"), error);
-    process.exit(1);
 });
 
 async function startBot() {

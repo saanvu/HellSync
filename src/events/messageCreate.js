@@ -1,4 +1,5 @@
 const { PermissionFlagsBits } = require('discord.js');
+const GuildSettings = require('../models/GuildSettings');
 
 // Track user messages for spam detection
 const userMessages = new Map();
@@ -16,25 +17,41 @@ module.exports = {
 
         // ========== PREFIX COMMAND HANDLING ==========
         const config = client.config || require('../config');
-        const prefix = config.prefix;
+        const prefix = await getGuildPrefix(message.guild.id, config.prefix);
 
         if (!message.content.startsWith(prefix)) return;
 
         const args = message.content.slice(prefix.length).trim().split(/ +/);
-        const commandName = args.shift().toLowerCase();
+        const commandName = (args.shift() || '').toLowerCase();
 
         const command = client.commands.get(commandName);
 
         if (!command || command.slashOnly) return;
 
         try {
-            await command.executePrefix(message, args, client);
+            if (typeof command.executePrefix === 'function') {
+                await command.executePrefix(message, args, client);
+            } else if (typeof command.execute === 'function') {
+                await command.execute(message, args, client);
+            } else {
+                return message.reply('This command is not available as a prefix command.');
+            }
         } catch (error) {
             console.error('Error executing prefix command:', error);
             await message.reply('There was an error while executing this command!');
         }
     }
 };
+
+async function getGuildPrefix(guildId, fallbackPrefix) {
+    try {
+        const settings = await GuildSettings.findOne({ guildId }).lean();
+        return settings?.prefix || fallbackPrefix;
+    } catch (error) {
+        console.error('Failed to load guild prefix:', error);
+        return fallbackPrefix;
+    }
+}
 
 // ========== AUTOMOD FUNCTION ==========
 async function runAutomod(message, client) {
@@ -43,11 +60,11 @@ async function runAutomod(message, client) {
     if (!config) return;
 
     // Check if channel is whitelisted
-    if (config.whitelistedChannels.includes(message.channel.id)) return;
+    if ((config.whitelistedChannels || []).includes(message.channel.id)) return;
 
     // Check if user has whitelisted role
     const hasWhitelistedRole = message.member.roles.cache.some(role => 
-        config.whitelistedRoles.includes(role.id)
+        (config.whitelistedRoles || []).includes(role.id)
     );
     if (hasWhitelistedRole) return;
 
@@ -59,29 +76,30 @@ async function runAutomod(message, client) {
     let reason = '';
 
     // ========== ANTI-SPAM DETECTION ==========
-    if (config.antispam.enabled) {
+    if (config.antispam?.enabled) {
         const userId = message.author.id;
+        const counterKey = `${message.guild.id}:${userId}`;
         const now = Date.now();
         
-        if (!userMessages.has(userId)) {
-            userMessages.set(userId, []);
+        if (!userMessages.has(counterKey)) {
+            userMessages.set(counterKey, []);
         }
 
-        const messages = userMessages.get(userId);
+        const messages = userMessages.get(counterKey);
         messages.push(now);
 
         // Remove old messages outside time window
         const recentMessages = messages.filter(timestamp => 
             now - timestamp < config.antispam.timeWindow
         );
-        userMessages.set(userId, recentMessages);
+        userMessages.set(counterKey, recentMessages);
 
         if (recentMessages.length >= config.antispam.messageLimit) {
             violated = true;
             reason = 'Spam detected';
             
             // Clear user messages
-            userMessages.delete(userId);
+            userMessages.delete(counterKey);
             
             try {
                 await message.member.timeout(60000, 'Automod: Spam detected');
@@ -94,7 +112,7 @@ async function runAutomod(message, client) {
     }
 
     // ========== BAD WORDS FILTER ==========
-    if (config.badwords.enabled && config.badwords.words.length > 0 && !violated) {
+    if (config.badwords?.enabled && (config.badwords.words || []).length > 0 && !violated) {
         const content = message.content.toLowerCase();
         const foundBadWord = config.badwords.words.some(word => {
             const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
@@ -116,7 +134,7 @@ async function runAutomod(message, client) {
     }
 
     // ========== ANTI-LINKS DETECTION ==========
-    if (config.antilinks.enabled && !violated) {
+    if (config.antilinks?.enabled && !violated) {
         const linkRegex = /(https?:\/\/[^\s]+)|(discord\.gg\/[^\s]+)|(discord\.com\/invite\/[^\s]+)/gi;
         const hasLinks = linkRegex.test(message.content);
 
@@ -135,7 +153,7 @@ async function runAutomod(message, client) {
     }
 
     // ========== ANTI-CAPS DETECTION ==========
-    if (config.anticaps.enabled && !violated) {
+    if (config.anticaps?.enabled && !violated) {
         const content = message.content;
         if (content.length >= config.anticaps.minLength) {
             const capsCount = (content.match(/[A-Z]/g) || []).length;
@@ -161,7 +179,7 @@ async function runAutomod(message, client) {
     }
 
     // ========== ANTI-MENTION SPAM DETECTION ==========
-    if (config.antimention.enabled && !violated) {
+    if (config.antimention?.enabled && !violated) {
         const mentions = message.mentions.users.size + message.mentions.roles.size;
         
         if (mentions >= config.antimention.mentionLimit) {
@@ -184,7 +202,7 @@ async function runAutomod(message, client) {
         console.log(`[Automod] ${message.author.tag} violated automod: ${reason}`);
         
         // Track warnings
-        const userId = message.author.id;
+        const userId = `${message.guild.id}:${message.author.id}`;
         if (!userWarnings.has(userId)) {
             userWarnings.set(userId, 0);
         }

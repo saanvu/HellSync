@@ -4,6 +4,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
+  PermissionFlagsBits,
   SlashCommandBuilder
 } = require("discord.js");
 
@@ -12,6 +13,45 @@ function formatDuration(ms = 0) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function isUrl(input) {
+  return /^https?:\/\//i.test(input);
+}
+
+function getMissingVoicePermissions(voiceChannel, botMember) {
+  if (!botMember) return ["View Channel", "Connect", "Speak"];
+
+  const permissions = voiceChannel.permissionsFor(botMember);
+  const missing = [];
+
+  if (!permissions?.has(PermissionFlagsBits.ViewChannel)) missing.push("View Channel");
+  if (!permissions?.has(PermissionFlagsBits.Connect)) missing.push("Connect");
+  if (!permissions?.has(PermissionFlagsBits.Speak)) missing.push("Speak");
+
+  return missing;
+}
+
+async function searchWithFallback(player, query, requester) {
+  if (isUrl(query)) {
+    return player.search({ query }, requester);
+  }
+
+  const sources = ["youtube", "soundcloud"];
+  let lastError = null;
+
+  for (const source of sources) {
+    try {
+      const result = await player.search({ query, source }, requester);
+      if (result?.tracks?.length) return result;
+    } catch (error) {
+      lastError = error;
+      console.warn(`Music search failed on ${source}:`, error?.message || error);
+    }
+  }
+
+  if (lastError) throw lastError;
+  return null;
 }
 
 module.exports = {
@@ -36,6 +76,14 @@ module.exports = {
       return interaction.editReply("❌ Join a voice channel first!");
     }
 
+    const botMember = interaction.guild.members.me;
+    const missingPermissions = getMissingVoicePermissions(voiceChannel, botMember);
+    if (missingPermissions.length) {
+      return interaction.editReply(
+        `❌ I am missing voice permissions in ${voiceChannel}: **${missingPermissions.join(", ")}**.`
+      );
+    }
+
     const query = interaction.options.getString("query", true);
 
     try {
@@ -58,6 +106,26 @@ module.exports = {
         await player.connect();
       }
 
+      setTimeout(() => {
+        const me = interaction.guild.members.me;
+        const voice = me?.voice;
+        console.log(
+          [
+            `Voice diagnostics for guild ${interaction.guild.id}:`,
+            `channel=${voice?.channelId || "none"}`,
+            `serverMute=${voice?.serverMute}`,
+            `selfMute=${voice?.selfMute}`,
+            `serverDeaf=${voice?.serverDeaf}`,
+            `selfDeaf=${voice?.selfDeaf}`,
+            `suppress=${voice?.suppress}`,
+            `playerConnected=${player.connected}`,
+            `playerPlaying=${player.playing}`,
+            `playerPaused=${player.paused}`,
+            `playerPing=${JSON.stringify(player.ping)}`,
+          ].join(" ")
+        );
+      }, 5_000);
+
       // ✅ FIX: Validate Lavalink node is connected BEFORE searching
       const nodes = client.lavalink.nodeManager.nodes;
       const hasConnectedNode = Array.from(nodes.values()).some(
@@ -70,8 +138,9 @@ module.exports = {
         "(The music server is initializing)"
        );
      }
-      // Search for tracks
-      const res = await player.search({ query }, interaction.user);
+      // Search for tracks. Avoid Spotify search because this Lavalink app's
+      // Spotify API currently returns 403 without an active premium owner.
+      const res = await searchWithFallback(player, query, interaction.user);
       if (!res || !res.tracks || res.tracks.length === 0) {
         return interaction.editReply("❌ No results found.");
       }

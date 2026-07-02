@@ -7,10 +7,10 @@ module.exports = {
         if (message.author?.bot) return;
 
         const config = client.loggingConfig?.get(message.guild.id);
-        if (!config || !config.enabledLogs.messageDelete || !config.actionLogChannel) return;
+        if (!config || !config.enabledLogs?.messageDelete || !config.actionLogChannel) return;
 
         // Check if channel is ignored
-        if (config.ignoredChannels.includes(message.channel.id)) return;
+        if ((config.ignoredChannels || []).includes(message.channel.id)) return;
 
         const logChannel = message.guild.channels.cache.get(config.actionLogChannel);
         if (!logChannel) return;
@@ -25,7 +25,7 @@ module.exports = {
             const deleteLog = auditLogs.entries.first();
             let deletedBy = 'Unknown';
 
-            if (deleteLog && deleteLog.target.id === message.author?.id &&
+            if (deleteLog && deleteLog.target?.id === message.author?.id &&
                 deleteLog.createdTimestamp > (Date.now() - 5000)) {
                 deletedBy = deleteLog.executor;
             } else {

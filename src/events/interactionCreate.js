@@ -1,4 +1,4 @@
-const { Events } = require('discord.js');
+const { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports = {
     name: Events.InteractionCreate,
@@ -7,174 +7,239 @@ module.exports = {
         // ========== HANDLE MODAL SUBMISSIONS ==========
         if (interaction.isModalSubmit() && interaction.customId === 'embed_modal') {
             try {
-                const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-
                 // Get stored channel data
                 const modalData = client.embedModalData?.get(interaction.user.id);
                 const targetChannel = modalData?.channel || interaction.channel;
 
-                // Get modal inputs
-                const title = interaction.fields.getTextInputValue('embed_title') || null;
-                let description = interaction.fields.getTextInputValue('embed_description') || null;
-                const colorInput = interaction.fields.getTextInputValue('embed_color') || '#5865F2';
-                const fieldsInput = interaction.fields.getTextInputValue('embed_fields') || null;
-                const imagesInput = interaction.fields.getTextInputValue('embed_images') || null;
+                // Get modal inputs with fallbacks
+                const title = interaction.fields.getTextInputValue('embed_title')?.trim() || null;
+                let description = interaction.fields.getTextInputValue('embed_description')?.trim() || null;
+                const colorInput = interaction.fields.getTextInputValue('embed_color')?.trim() || '#5865F2';
+                const fieldsInput = interaction.fields.getTextInputValue('embed_fields')?.trim() || null;
+                const imagesInput = interaction.fields.getTextInputValue('embed_images')?.trim() || null;
 
                 // Replace \n with actual newlines
                 if (description) {
                     description = description.replace(/\\n/g, '\n');
                 }
 
-                // Parse color
-                function parseColor(colorInput) {
-                    if (!colorInput) return '#5865F2';
-                    if (colorInput.match(/^#?[0-9a-fA-F]{6}$/)) {
-                        return colorInput.startsWith('#') ? colorInput : `#${colorInput}`;
+                // Enhanced color parser
+                const parseColor = (color) => {
+                    if (!color) return 0x5865F2;
+                    
+                    // Hex color validation
+                    if (color.match(/^#?[0-9a-fA-F]{6}$/i)) {
+                        const hex = color.startsWith('#') ? color.slice(1) : color;
+                        return parseInt(hex, 16);
                     }
+                    
+                    // Named colors
                     const colors = {
-                        red: '#ED4245', blue: '#5865F2', green: '#57F287',
-                        yellow: '#FEE75C', purple: '#5865F2', orange: '#F26522'
+                        red: 0xED4245, green: 0x57F287, blue: 0x5865F2,
+                        yellow: 0xFEE75C, purple: 0xA78BFA, orange: 0xF26522,
+                        pink: 0xFF6B9D, grey: 0x99AAB5
                     };
-                    return colors[colorInput.toLowerCase()] || '#5865F2';
-                }
+                    
+                    return colors[color.toLowerCase()] || 0x5865F2;
+                };
 
+                // Build embed step by step
                 const embed = new EmbedBuilder()
-                    .setColor(parseColor(colorInput));
+                    .setColor(parseColor(colorInput))
+                    .setTimestamp();
 
                 if (title) embed.setTitle(title);
                 if (description) embed.setDescription(description);
 
                 // Parse fields (format: name|value|inline)
                 if (fieldsInput) {
-                    const fieldLines = fieldsInput.split('\n').filter(line => line.trim());
-                    fieldLines.forEach(line => {
+                    const fieldLines = fieldsInput.split('\n')
+                        .map(line => line.trim())
+                        .filter(line => line.length > 0);
+                    
+                    for (const line of fieldLines) {
                         const parts = line.split('|').map(p => p.trim());
-                        if (parts.length >= 2) {
-                            embed.addFields({
-                                name: parts[0],
-                                value: parts[1],
-                                inline: parts[2]?.toLowerCase() === 'true'
-                            });
+                        if (parts.length >= 2 && parts[0] && parts[1]) {
+                            try {
+                                embed.addFields({
+                                    name: parts[0].substring(0, 256),
+                                    value: parts[1].substring(0, 1024),
+                                    inline: parts[2]?.toLowerCase() === 'true'
+                                });
+                            } catch {
+                                continue; // Skip invalid fields
+                            }
                         }
-                    });
+                    }
                 }
 
                 // Parse images (format: thumbnail|image)
                 if (imagesInput) {
-                    const urls = imagesInput.split('|').map(u => u.trim()).filter(Boolean);
+                    const urls = imagesInput.split('|')
+                        .map(u => u.trim())
+                        .filter(Boolean);
+                    
                     if (urls[0]) embed.setThumbnail(urls[0]);
                     if (urls[1]) embed.setImage(urls[1]);
                 }
 
-                // Show preview with buttons
-                const row = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('embed_send')
-                        .setLabel('✅ Send')
-                        .setStyle(ButtonStyle.Success),
-                    new ButtonBuilder()
-                        .setCustomId('embed_cancel')
-                        .setLabel('❌ Cancel')
-                        .setStyle(ButtonStyle.Danger)
-                );
+                // Create action buttons
+                const row = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId('embed_send')
+                            .setLabel('✅ Send Embed')
+                            .setStyle(ButtonStyle.Success)
+                            .setEmoji('📤'),
+                        
+                        new ButtonBuilder()
+                            .setCustomId('embed_edit')
+                            .setLabel('✏️ Edit')
+                            .setStyle(ButtonStyle.Secondary)
+                            .setEmoji('🔄'),
+                        
+                        new ButtonBuilder()
+                            .setCustomId('embed_cancel')
+                            .setLabel('❌ Cancel')
+                            .setStyle(ButtonStyle.Danger)
+                    );
 
-                const reply = await interaction.reply({
-                    content: `**📋 Embed Preview**\n**Target Channel:** ${targetChannel}\n\nClick **Send** to post or **Cancel** to discard.`,
+                // Send preview
+                const previewMsg = await interaction.reply({
+                    content: `**📋 Embed Preview**\n**👤 Author:** ${interaction.user.tag}\n**📍 Target:** ${targetChannel}\n\nReact within **60 seconds** ⏰`,
                     embeds: [embed],
                     components: [row],
                     ephemeral: true,
                     fetchReply: true
                 });
 
-                const collector = reply.createMessageComponentCollector({
+                // Button collector
+                const collector = previewMsg.createMessageComponentCollector({
                     time: 60_000,
                     filter: (i) => i.user.id === interaction.user.id
                 });
 
+                let embedSent = false;
+
                 collector.on('collect', async (i) => {
-                    if (i.customId === 'embed_send') {
-                        await targetChannel.send({ embeds: [embed] });
-                        await i.update({
-                            content: `✅ **Embed sent to ${targetChannel}!**`,
-                            embeds: [],
-                            components: []
-                        });
-                        collector.stop('sent');
-                    } else if (i.customId === 'embed_cancel') {
-                        await i.update({
-                            content: '❌ Embed cancelled.',
-                            embeds: [],
-                            components: []
-                        });
-                        collector.stop('cancelled');
+                    await i.deferUpdate();
+
+                    try {
+                        switch (i.customId) {
+                            case 'embed_send':
+                                await targetChannel.send({ embeds: [embed] });
+                                await i.editReply({
+                                    content: `✅ **Embed successfully sent to ${targetChannel}!** 🎉`,
+                                    embeds: [],
+                                    components: []
+                                });
+                                embedSent = true;
+                                collector.stop('sent');
+                                break;
+
+                            case 'embed_edit':
+                                await i.editReply({
+                                    content: '✏️ **Modal reopened** - edit and submit again!',
+                                    embeds: [],
+                                    components: []
+                                });
+                                collector.stop('edit');
+                                break;
+
+                            case 'embed_cancel':
+                                await i.editReply({
+                                    content: '❌ **Embed creation cancelled.**',
+                                    embeds: [],
+                                    components: []
+                                });
+                                collector.stop('cancelled');
+                                break;
+                        }
+                    } catch (error) {
+                        console.error('Button interaction error:', error);
+                        await i.followUp({
+                            content: '❌ Error processing button click!',
+                            ephemeral: true
+                        }).catch(() => {});
                     }
                 });
 
-                collector.on('end', async (_, reason) => {
-                    if (reason === 'time') {
+                collector.on('end', async (collected, reason) => {
+                    if (!embedSent && reason === 'time') {
                         try {
                             await interaction.editReply({
-                                content: '⏰ Timed out.',
+                                content: '⏰ **Preview timed out** - embed not sent.',
                                 embeds: [],
                                 components: []
                             });
-                        } catch (e) {}
+                        } catch (e) {
+                            // Already handled or deleted
+                        }
                     }
                 });
 
-                // Clean up stored data
+                // Clean up modal data
                 client.embedModalData?.delete(interaction.user.id);
 
             } catch (error) {
-                console.error('Modal submit error:', error);
-                if (!interaction.replied) {
-                    await interaction.reply({ content: '❌ Error creating embed!', ephemeral: true });
+                console.error('❌ Modal submit error:', error);
+                
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply({
+                        content: '❌ **Failed to create embed!** Check console for details.',
+                        ephemeral: true
+                    }).catch(() => {});
                 }
             }
-            return; // Exit after handling modal
+            return;
         }
 
-        // ========== HANDLE SLASH COMMANDS ==========
-        // Ignore non-chat input
+        // ========== HANDLE BUTTON INTERACTIONS ==========
+        if (interaction.isButton()) {
+            console.log(`🔘 Button clicked: ${interaction.customId} by ${interaction.user.tag}`);
+            // Add custom button handlers here if needed
+            return;
+        }
+
+        // ========== HANDLE CHAT INPUT (SLASH) COMMANDS ==========
         if (!interaction.isChatInputCommand()) return;
 
-        // Get command name
         const commandName = interaction.commandName.toLowerCase();
         
-        // Find command in either collection
+        // Try both command collections
         const command = client.commands.get(commandName) || 
-                       client.slashCommands.get(commandName);
+                       client.slashCommands?.get(commandName);
 
         if (!command) {
-            console.log(`❌ Command ${commandName} not found`);
+            console.log(`❌ Slash command /${commandName} not found`);
             return;
         }
 
         try {
             console.log(`🔥 Executing slash: /${commandName} by ${interaction.user.tag}`);
 
-            // Try executeSlash FIRST, then fallback to execute
+            // Execute appropriate method
             if (typeof command.executeSlash === 'function') {
                 await command.executeSlash(interaction, client);
             } else if (typeof command.execute === 'function') {
                 await command.execute(interaction, client);
             } else {
-                console.log(`❌ Command ${commandName} has no execute method`);
+                console.log(`❌ Command ${commandName} missing execute method`);
+                return;
             }
 
         } catch (error) {
-            console.error(`❌ Error executing /${commandName}:`, error);
+            console.error(`❌ Slash command /${commandName} error:`, error);
 
-            const errorEmbed = {
-                content: '❌ An error occurred while executing this command!',
-                flags: [64]
+            const errorReply = {
+                content: '❌ **An error occurred while executing this command!**',
+                ephemeral: true
             };
 
-            // Avoid replying twice (ephemeral commands)
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply(errorEmbed).catch(() => {
-                    interaction.followUp(errorEmbed).catch(console.error);
-                });
+            if (interaction.deferred || interaction.replied) {
+                await interaction.followUp(errorReply).catch(() => {});
+            } else {
+                await interaction.reply(errorReply).catch(() => {});
             }
         }
     }

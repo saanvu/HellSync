@@ -4,7 +4,7 @@ module.exports = {
     name: Events.GuildMemberRemove,
     async execute(member, client) {
         const config = client.loggingConfig?.get(member.guild.id);
-        if (!config || !config.enabledLogs.memberLeave || !config.joinLogChannel) return;
+        if (!config || !config.enabledLogs?.memberLeave || !config.joinLogChannel) return;
 
         const logChannel = member.guild.channels.cache.get(config.joinLogChannel);
         if (!logChannel) return;

@@ -5,5 +5,5 @@ module.exports = {
   clientId: process.env.CLIENT_ID,
   guildId: process.env.GUILD_ID,
   mongodb: process.env.MONGODB_URI,
-  prefix: '!'
+  prefix: process.env.PREFIX || '!'
 };
