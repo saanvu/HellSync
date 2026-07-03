@@ -78,7 +78,7 @@ client.lavalink = new LavalinkManager({
   autoSkip: true,
   emitNewSongsOnly: true,
   playerOptions: {
-    defaultSearchPlatform: "ytsearch",
+    defaultSearchPlatform: "scsearch",
   },
   advancedOptions: {
     debugOptions: {
