@@ -63,9 +63,9 @@ client.lavalink = new LavalinkManager({
   nodes: [
     {
       id: "Lavalink",
-      host: "127.0.0.1",
-      port: 2333,
-      authorization: "demibloom_1710",
+      host: "lavalinkv4.serenetia.com",
+      port: 80,
+      authorization: "https://seretia.link/discord",
       secure: false,
     },
   ],
